@@ -12,6 +12,8 @@
 ## Live Demo
 
 👉 **[kirti.github.io/github-actions-node-patterns](https://kirti.github.io/github-actions-node-patterns/)**
+<img width="1559" height="937" alt="preview2" src="https://github.com/user-attachments/assets/f09f8564-c3df-4069-9552-b603740d6304" />
+<img width="1362" height="1029" alt="preview" src="https://github.com/user-attachments/assets/def286bd-86e2-4989-96af-4c540c6cf600" />
 
 Interactive dashboard showing all 8 workflows, pipeline flow diagram, and copy-paste code snippets.
 
@@ -329,5 +331,5 @@ Every Monday 9am
 
 ---
 
-*Built by [Kirti Kaushal](https://www.linkedin.com/in/kirti3/) — Senior AI/ML + Full Stack Engineer*
+*Built by [Kirti Kaushal](https://www.linkedin.com/in/kirti3/) —  Full Stack Engineer * AI/ML * Agent AI 
 *[LinkedIn](https://www.linkedin.com/in/kirti3/) · [Medium](https://kirtikau.medium.com) · [npm](https://www.npmjs.com/package/skillforge-ai)*
