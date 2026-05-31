@@ -1,0 +1,104 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  schedule:
+    - cron: '0 9 * * 1'  # Every Monday at 9am UTC
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run security audit
+        id: audit
+        run: |
+          npm audit --audit-level=critical --json > audit-results.json || true
+          CRITICAL=$(cat audit-results.json | node -e "
+            const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
+            console.log(d.metadata?.vulnerabilities?.critical || 0)
+          ")
+          HIGH=$(cat audit-results.json | node -e "
+            const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
+            console.log(d.metadata?.vulnerabilities?.high || 0)
+          ")
+          echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
+          echo "high=$HIGH" >> $GITHUB_OUTPUT
+          echo "Critical: $CRITICAL, High: $HIGH"
+
+      - name: Upload audit results
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-results
+          path: audit-results.json
+          retention-days: 30
+
+      - name: Fail on critical vulnerabilities
+        if: steps.audit.outputs.critical > 0
+        run: |
+          echo "❌ Found ${{ steps.audit.outputs.critical }} critical vulnerabilities!"
+          echo "Run 'npm audit fix' to remediate"
+          exit 1
+
+      - name: Auto-create issue on critical CVEs
+        if: failure() && github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const critical = '${{ steps.audit.outputs.critical }}';
+            const high = '${{ steps.audit.outputs.high }}';
+            const date = new Date().toISOString().split('T')[0];
+
+            // Check if issue already exists this week
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'security'
+            });
+
+            const existing = issues.find(i => i.title.includes('Security Audit'));
+            if (existing) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body: `## 🔴 Security Audit — ${date}\n\n**Critical:** ${critical}\n**High:** ${high}\n\n### Remediation\n\`\`\`bash\nnpm audit fix\nnpm audit fix --force  # for breaking changes\n\`\`\`\n\n[View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `🔴 Security Audit: ${critical} critical CVEs found — ${date}`,
+                body: `## Security Audit — ${date}\n\n**Critical:** ${critical}\n**High:** ${high}\n\n### Remediation\n\`\`\`bash\nnpm audit fix\nnpm audit fix --force  # for breaking changes\n\`\`\`\n\n[View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`,
+                labels: ['security', 'automated']
+              });
+            }
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Security Audit Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Critical | ${{ steps.audit.outputs.critical }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| High | ${{ steps.audit.outputs.high }} |" >> $GITHUB_STEP_SUMMARY
