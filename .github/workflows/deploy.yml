@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [ master ]  # Only deploy from master
+    branches: [ main ]  # Only deploy from master
   workflow_dispatch:  # Allow manual trigger
 
 # Sets permissions for GITHUB_TOKEN
